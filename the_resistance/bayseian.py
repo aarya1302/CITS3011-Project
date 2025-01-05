@@ -4,6 +4,8 @@ import numpy as np
 
 class EnhancedBayesianAgent(Agent):
     '''An enhanced implementation of a Bayesian agent for The Resistance'''
+    
+
 
     def __init__(self, name='EnhancedBayesian', history=None):
         '''
@@ -11,22 +13,32 @@ class EnhancedBayesianAgent(Agent):
         '''
         self.name = name
         self.spies_history = history if history is not None else {}
+        self.players_history = {}
+    def calculate_prob_spy(self, player, evidence): 
+        pass 
 
     def new_game(self, number_of_players, player_number, spy_list):
         '''
         Initializes the game, setting up the belief system.
         '''
-        self.number_of_players = number_of_players
-        self.player_number = player_number
-        self.spy_list = spy_list
-        self.is_spy_flag = player_number in spy_list
+        self.number_of_players = number_of_players # current number of players
+        self.player_number = player_number # agent's player number
+        self.spy_list = spy_list # current list of spies 
+        self.is_spy_flag = player_number in spy_list # if agent is a sply 
         
-        # Initial belief: uniform probability that each other player is a spy
+        self.spy_evidence = {}
+        self.players_history = {i: {"failed_mission_member": 0, "failed_mission_votes": 0, "team_leader":0, "failed_team_leader":0}for i in range(number_of_players)}
+        
+        ''' Probability of being a spy is set to number of spies / number of players'''
         self.beliefs = np.full(number_of_players, round(((number_of_players - 1)/3))/(number_of_players-1))
         self.beliefs[player_number] = 0  # Agent knows it is not a spy
 
         # Initialize beliefs with prior knowledge
         self.initialize_beliefs()
+        
+        # ADD DEBUG LOG HERE 
+        print(f"{self.players_history}")
+        
 
     def initialize_beliefs(self):
         for player in range(self.number_of_players):
@@ -108,15 +120,14 @@ class EnhancedBayesianAgent(Agent):
         Updates beliefs based on mission outcome.
         If the mission fails, increase suspicion on those in the mission.
         '''
-        for agent in mission:
-            if agent != self.player_number:
-                if not mission_success:
-                    self.beliefs[agent] *= 1.5  # Increase suspicion of those on failed missions
-                else:
-                    self.beliefs[agent] *= 0.8  # Decrease suspicion of those on successful missions
+        vote_failed_team = None
+        selected_failed_team = None 
+        
+        # Updating Beliefs for players in mission
+        self.update_history(mission, proposer, mission_success)
+        
+                
 
-                # Track historical outcome for the agent
-                self.update_spy_history(agent, 'success' if mission_success else 'failure')
 
         # Normalize beliefs after updating
         self.beliefs /= self.beliefs.sum()
@@ -134,8 +145,17 @@ class EnhancedBayesianAgent(Agent):
         # Nothing to update here, but could track statistics for self-improvement
         pass
 
-    def update_spy_history(self, player, outcome):
+    def update_history(self,mission,proposer, mission_success):
         """ Update the spy history for a player. """
-        if player not in self.spies_history:
-            self.spies_history[player] = []
-        self.spies_history[player].append(outcome)  # Add the outcome (e.g., 'success' or 'failure') to history
+        for agent in mission:
+            if agent != self.player_number:
+                if not mission_success:
+                    self.players_history[proposer]["failed_team_leader"] += 1
+                    self.players_history[agent]["failed_mission_member"]  += 1
+                    self.beliefs[agent] *= 1.5  # Increase suspicion of those on failed missions
+                else:
+                    self.players_history[proposer]["team_leader"] += 1
+                    
+                    self.beliefs[agent] *= 0.8  # Decrease suspicion of those on successful missions
+
+            
